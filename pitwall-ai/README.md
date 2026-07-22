@@ -7,7 +7,6 @@ This application combines numerical F1 telemetry via the `FastF1` Python library
 ## Directory Structure
 
 - `backend/`: FastAPI application handling logic, data fetching (FastF1), embeddings generation, vector search (Qdrant), and LLM inference (Groq).
-- `frontend/`: Streamlit dashboard offering an interactive user interface.
 
 ## Quickstart
 
@@ -17,10 +16,7 @@ This application combines numerical F1 telemetry via the `FastF1` Python library
 3. **Backend**
    - Navigate to `backend/` and install requirements: `pip install -r requirements.txt`
    - Run the FastAPI server: `uvicorn app.main:app --reload`
-4. **Frontend**
-   - Navigate to `frontend/` and install requirements: `pip install -r requirements.txt`
-   - Run the Streamlit app: `streamlit run app.py`
 
 ## Docker
 
-Both the backend and frontend have their respective `Dockerfile`s if you prefer containerized deployment.
+The backend has a `Dockerfile` if you prefer containerized deployment.
