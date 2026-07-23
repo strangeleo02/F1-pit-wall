@@ -14,6 +14,7 @@ def test_get_telemetry_success(mock_get_session):
 
     mock_get_session.return_value = mock_session
     mock_session.laps = mock_laps
+    mock_laps.pick_drivers.return_value = mock_driver_laps
     mock_laps.pick_driver.return_value = mock_driver_laps
 
     type(mock_driver_laps).empty = False
@@ -55,6 +56,7 @@ def test_get_telemetry_no_laps(mock_get_session):
 
     mock_get_session.return_value = mock_session
     mock_session.laps = mock_laps
+    mock_laps.pick_drivers.return_value = mock_driver_laps
     mock_laps.pick_driver.return_value = mock_driver_laps
 
     type(mock_driver_laps).empty = True

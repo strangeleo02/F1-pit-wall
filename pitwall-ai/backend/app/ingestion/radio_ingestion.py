@@ -4,12 +4,45 @@ from app.services.openf1_service import OpenF1Service
 from app.services.embedding_service import generate_embeddings_batch_async
 from app.services.vector_db import upsert_radio_transcripts
 
+GP_ALIASES = {
+    "monza": ["monza", "italy", "italian"],
+    "italian": ["monza", "italy", "italian"],
+    "silverstone": ["silverstone", "great britain", "british", "uk"],
+    "british": ["silverstone", "great britain", "british"],
+    "spa": ["spa", "belgium", "belgian", "francorchamps"],
+    "belgian": ["spa", "belgium", "belgian"],
+    "monaco": ["monaco", "monte carlo"],
+    "austin": ["austin", "united states", "american", "us", "cota"],
+    "cota": ["austin", "united states", "american", "us"],
+    "suzuka": ["suzuka", "japan", "japanese"],
+    "interlagos": ["interlagos", "brazil", "brazilian", "são paulo"],
+    "zandvoort": ["zandvoort", "netherlands", "dutch"],
+    "singapore": ["singapore", "marina bay"],
+    "abu dhabi": ["abu dhabi", "yas marina", "uae"],
+    "las vegas": ["las vegas", "vegas"]
+}
+
+def match_gp_name(gp_query: str, location: str, country: str, event_name: str = "") -> bool:
+    q = gp_query.lower().strip()
+    loc = location.lower().strip()
+    cou = country.lower().strip()
+    ev = event_name.lower().strip()
+
+    if q in loc or loc in q or q in cou or cou in q or q in ev or ev in q:
+        return True
+
+    for key, aliases in GP_ALIASES.items():
+        if key in q or any(a in q for a in aliases):
+            if any(a in loc or a in cou or a in ev for a in aliases):
+                return True
+
+    return False
+
 class RadioIngestionPipeline:
     """
     Automated pipeline to ingest driver radio transcripts and race control messages,
     generate vector embeddings, and store indexed payload objects in Qdrant.
     """
-
     def __init__(self, qdrant_client: AsyncQdrantClient | None = None):
         self.qdrant_client = qdrant_client
 
@@ -31,7 +64,7 @@ class RadioIngestionPipeline:
                 sessions = []
             gp_query = grand_prix.lower().strip()
 
-            # First pass: try matching location/country AND session_name
+            # First pass: match GP alias/location AND session_type
             for s in sessions:
                 if not isinstance(s, dict):
                     continue
@@ -39,8 +72,7 @@ class RadioIngestionPipeline:
                 location = (s.get("location") or "").lower()
                 s_name = (s.get("session_name") or s.get("session_type") or "").lower()
 
-                matches_gp = (gp_query in location or location in gp_query or
-                              gp_query in country or country in gp_query)
+                matches_gp = match_gp_name(gp_query, location, country, s_name)
 
                 matches_session = False
                 if session_type.upper() == "R" and ("race" in s_name or s_name == "r"):
@@ -54,7 +86,7 @@ class RadioIngestionPipeline:
                     session_key = s.get("session_key")
                     break
 
-            # Fallback pass: match location and pick race session
+            # Fallback pass: match GP alias and pick race session
             if session_key is None:
                 for s in sessions:
                     if not isinstance(s, dict):
@@ -62,7 +94,7 @@ class RadioIngestionPipeline:
                     location = (s.get("location") or "").lower()
                     country = (s.get("country_name") or "").lower()
                     s_name = (s.get("session_name") or "").lower()
-                    if (gp_query in location or location in gp_query or gp_query in country) and "race" in s_name:
+                    if match_gp_name(gp_query, location, country, s_name) and "race" in s_name:
                         session_key = s.get("session_key")
                         break
 

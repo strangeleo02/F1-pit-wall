@@ -77,12 +77,12 @@ This itemized roadmap outlines the development plan for **PitWall AI**, progress
 
 ## 📌 Phase 5: CI/CD, Containerization & Cloud Deployment
 
-- [ ] **5.1 Multi-Stage Dockerfile Optimization**
-  - Optimize Dockerfiles for both backend (FastAPI) and frontend (Next.js) using multi-stage builds to minimize image size and improve startup latency.
+- [x] **5.1 Multi-Stage Dockerfile & Docker Compose Optimization**
+  - Optimize `backend/Dockerfile` using multi-stage builds (`python:3.11-slim`) to minimize image size and improve startup latency.
+  - Implement `docker-compose.yml` configuration for containerized backend execution and healthchecks.
 
-- [ ] **5.2 GitHub Actions CI/CD Pipeline**
-  - Configure automated linting (`ruff`/`ESLint`), type checking (`mypy`/`TypeScript`), and test execution (`pytest`) on pull requests.
+- [x] **5.2 GitHub Actions CI/CD Pipeline**
+  - Configure `.github/workflows/ci.yml` for automated linting (`ruff`), quality checks, and automated pytest execution (`pytest`) on pull requests and pushes to `main`.
 
 - [ ] **5.3 $0 Infrastructure Deployment**
-  - Host the Next.js frontend on Vercel and backend API on free container hosting.
-  - Connect with Qdrant Cloud (Free Tier) and Groq Cloud API (`llama-3.3-70b-versatile`).
+  - Host the backend API on free container hosting (Render/Fly.io) and Qdrant Cloud (Free Tier) with Groq Cloud API (`llama-3.3-70b-versatile`).

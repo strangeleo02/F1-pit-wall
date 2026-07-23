@@ -37,6 +37,7 @@ def test_telemetry_timeseries_extraction():
     mock_driver_laps.pick_fastest.return_value = fastest_lap
     mock_driver_laps.__getitem__.side_effect = lambda key: laps_df[key]
 
+    mock_session.laps.pick_drivers.return_value = mock_driver_laps
     mock_session.laps.pick_driver.return_value = mock_driver_laps
 
     with patch("fastf1.get_session", return_value=mock_session):

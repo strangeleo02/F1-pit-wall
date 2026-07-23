@@ -5,7 +5,7 @@ from qdrant_client import AsyncQdrantClient
 
 from app.config import settings
 from app.exceptions import PitWallException, pitwall_exception_handler
-from app.routers import strategy
+from app.routers import strategy, meta
 from app.services.vector_db import ensure_collection_exists
 
 @asynccontextmanager
@@ -45,16 +45,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import os
+from fastapi.staticfiles import StaticFiles
+
 # Register Exception Handlers
 app.add_exception_handler(PitWallException, pitwall_exception_handler)
 
 # Include routers
 app.include_router(strategy.router, prefix="/api/v1")
+app.include_router(meta.router, prefix="/api/v1")
 
 @app.get("/health", tags=["Health"])
 async def health_check():
     """Health check endpoint to verify the API is running."""
     return {"status": "ok"}
+
+# Mount pitwall-frontend static production export if present
+FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../pitwall-frontend/out"))
+if os.path.exists(FRONTEND_DIR):
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
 
 if __name__ == "__main__":
     import uvicorn

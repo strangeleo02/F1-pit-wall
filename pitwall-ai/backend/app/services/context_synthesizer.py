@@ -87,7 +87,8 @@ class ContextSynthesizer:
         """
         system_prompt = (
             "You are a senior F1 pit-wall race strategist and telemetry engineer.\n"
-            "Analyze the provided F1 data and answer the user's question clearly, concisely, and accurately."
+            "CRITICAL DIRECTIVE: Always prioritize hard numerical telemetry metrics, lap time deltas, speed traces, throttle percentages, and braking statistics as your PRIMARY ground-truth evidence.\n"
+            "Treat team radio transcripts as secondary supplemental context. When telemetry metrics and driver radio complaints differ or overlap, ground your primary analysis and conclusions strictly in the hard telemetry data."
         )
 
         laps = telemetry_data.get("laps", [])
@@ -98,26 +99,30 @@ class ContextSynthesizer:
 
         if intent in (QueryIntent.TELEMETRY_ONLY, QueryIntent.MULTI_MODAL_RAG):
             telemetry_summary = {k: v for k, v in telemetry_data.items() if k != "telemetry_stream"}
-            if "laps" in telemetry_summary and isinstance(telemetry_summary["laps"], list) and len(telemetry_summary["laps"]) > 10:
-                telemetry_summary["total_laps"] = len(telemetry_summary["laps"])
-                telemetry_summary["sample_laps"] = telemetry_summary["laps"][:3] + telemetry_summary["laps"][-3:]
-                del telemetry_summary["laps"]
 
-            user_prompt += f"Telemetry Statistical Summary:\n{telemetry_summary}\n\n"
+            # Include full lap times list so LLM has visibility into all stints and lap ranges
+            user_prompt += f"Telemetry Statistical Summary & Complete Lap Times:\n{telemetry_summary}\n\n"
 
             if anomalies:
                 user_prompt += f"Detected Lap Time Anomalies / Spikes:\n{anomalies}\n\n"
 
         if intent in (QueryIntent.RADIO_ONLY, QueryIntent.MULTI_MODAL_RAG):
             user_prompt += "Team Radio Communications & Race Control:\n"
-            if correlated_transcripts:
-                for t in correlated_transcripts:
+            valid_items = [
+                t for t in correlated_transcripts
+                if (t.get("transcript_text") or t.get("text"))
+            ]
+            if valid_items:
+                for t in valid_items:
                     driver = t.get("driver", "UNK")
                     lap = t.get("lap_start")
                     lap_str = f" [Lap {lap}]" if lap else ""
                     text = t.get("transcript_text") or t.get("text", "")
+                    gp = t.get("grand_prix") or ""
+                    year_val = t.get("year") or ""
+                    gp_str = f" ({year_val} {gp})" if gp and year_val else ""
                     corr_flag = " ⭐ [Correlated Anomaly]" if t.get("correlated_anomaly") else ""
-                    user_prompt += f"- {driver}{lap_str}: {text}{corr_flag}\n"
+                    user_prompt += f"- {driver}{lap_str}{gp_str}: {text}{corr_flag}\n"
             else:
                 user_prompt += "No team radio messages available for this query.\n"
 

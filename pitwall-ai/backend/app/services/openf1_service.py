@@ -123,7 +123,8 @@ class OpenF1Service:
 
             recording_url = item.get("recording_url") or ""
             transcript_content = item.get("transcript") or item.get("text") or item.get("message")
-            if transcript_content:
+
+            if transcript_content and not str(transcript_content).startswith("Team radio audio:") and not str(transcript_content).startswith("http"):
                 text = str(transcript_content)
             else:
                 text = f"Driver {driver_code} ({team_name}) team radio transmission"

@@ -153,29 +153,32 @@ async def search_radio_transcripts(
             return [point.payload for point in res if point.payload]
 
     try:
+        norm_driver = driver.upper().strip() if driver else None
+        norm_session = session.upper().strip() if session else None
+
         # Primary pass: search with all supplied filters
-        query_filter = _build_filter(driver, session, year, grand_prix)
+        query_filter = _build_filter(norm_driver, norm_session, year, grand_prix)
         results = await _execute_query(query_filter)
         if results:
             return results
 
-        # Fallback pass 1: relax grand_prix filter if location string format differs
+        # Fallback pass 1: relax grand_prix filter (retaining strict driver, session, and year)
         if grand_prix:
-            fallback_filter = _build_filter(driver, session, year, None)
+            fallback_filter = _build_filter(norm_driver, norm_session, year, None)
             results = await _execute_query(fallback_filter)
             if results:
                 return results
 
-        # Fallback pass 2: search by year & driver
-        if driver and year:
-            fallback_filter = _build_filter(driver, None, year, None)
+        # Fallback pass 2: relax session filter (retaining strict driver and year)
+        if norm_driver and year:
+            fallback_filter = _build_filter(norm_driver, None, year, None)
             results = await _execute_query(fallback_filter)
             if results:
                 return results
 
-        # Fallback pass 3: search by query embedding only
-        results = await _execute_query(None)
-        return results
+        # Return empty list if no matching transcripts exist for this driver/year
+        # DO NOT fall back to unfiltered global search across random drivers or years!
+        return []
     except VectorDBUnavailableError:
         raise
     except Exception as e:
