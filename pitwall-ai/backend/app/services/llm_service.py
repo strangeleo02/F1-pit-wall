@@ -1,52 +1,70 @@
+from typing import AsyncGenerator
 import groq
 from app.config import settings
+from app.exceptions import LLMGenerationError
 
-def get_groq_client() -> groq.Groq | None:
-    """Initializes the Groq client."""
-    if not settings.GROQ_API_KEY:
-        print("Warning: GROQ_API_KEY is not set. LLM features will be disabled.")
-        return None
-    return groq.Groq(api_key=settings.GROQ_API_KEY)
-
-client = get_groq_client()
-
-def generate_strategy_insight(query: str, telemetry_context: dict, radio_context: list[dict]) -> str:
+async def generate_strategy_insight(
+    client: groq.AsyncGroq | None,
+    query: str | None = None,
+    telemetry_context: dict | None = None,
+    radio_context: list[dict] | None = None,
+    system_prompt: str | None = None,
+    user_prompt: str | None = None
+) -> str:
     """
-    Uses the Groq API to generate a strategy answer based on context.
-
-    Args:
-        query (str): The user's strategy question.
-        telemetry_context (dict): Telemetry data fetched from FastF1.
-        radio_context (list[dict]): Relevant radio transcripts from Qdrant.
-
-    Returns:
-        str: The LLM's generated response.
+    Asynchronously uses the Groq API to generate a strategy answer based on synthesized context.
     """
     if not client:
-        return "Error: Groq client is not configured."
+        raise LLMGenerationError("Groq client is not configured.")
 
-    system_prompt = """You are a senior F1 race strategist.
-    You will be provided with telemetry data and relevant team radio communications.
-    Use this information to answer the user's question clearly and accurately.
-    """
-
-    # Construct the user prompt with context
-    user_prompt = f"Question: {query}\n\n"
-    user_prompt += f"Telemetry Data:\n{telemetry_context}\n\n"
-    user_prompt += "Team Radio Communications:\n"
-    for transcript in radio_context:
-        user_prompt += f"- {transcript.get('text', 'No text available')}\n"
+    if not system_prompt or not user_prompt:
+        system_prompt = system_prompt or "You are a senior F1 race strategist on the pit wall."
+        telemetry_summary = {k: v for k, v in (telemetry_context or {}).items() if k != "telemetry_stream"}
+        user_prompt = f"Question: {query}\n\nTelemetry Summary:\n{telemetry_summary}\n\nRadio Transcripts:\n{radio_context}"
 
     try:
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            model="llama3-8b-8192", # Example model, can be updated
+            model=settings.GROQ_MODEL_NAME,
             temperature=0.5,
             max_tokens=1024
         )
         return response.choices[0].message.content
+    except LLMGenerationError:
+        raise
     except Exception as e:
-        return f"Failed to generate insight: {str(e)}"
+        raise LLMGenerationError(f"Failed to generate insight: {str(e)}")
+
+async def stream_strategy_insight(
+    client: groq.AsyncGroq | None,
+    system_prompt: str,
+    user_prompt: str
+) -> AsyncGenerator[str, None]:
+    """
+    Asynchronously streams strategy response tokens from Groq API via an AsyncGenerator.
+    """
+    if not client:
+        raise LLMGenerationError("Groq client is not configured.")
+
+    try:
+        response_stream = await client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            model=settings.GROQ_MODEL_NAME,
+            temperature=0.5,
+            max_tokens=1024,
+            stream=True
+        )
+
+        async for chunk in response_stream:
+            if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+    except LLMGenerationError:
+        raise
+    except Exception as e:
+        raise LLMGenerationError(f"Failed to stream insight: {str(e)}")

@@ -1,7 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 from app.main import app
+from app.exceptions import TelemetryNotFoundError
 
 client = TestClient(app)
 
@@ -10,10 +11,10 @@ def test_health_check():
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
-@patch('app.routers.strategy.get_telemetry')
-@patch('app.routers.strategy.generate_embedding')
-@patch('app.routers.strategy.search_radio_transcripts')
-@patch('app.routers.strategy.generate_strategy_insight')
+@patch('app.routers.strategy.get_telemetry_async', new_callable=AsyncMock)
+@patch('app.routers.strategy.generate_embedding_async', new_callable=AsyncMock)
+@patch('app.routers.strategy.search_radio_transcripts', new_callable=AsyncMock)
+@patch('app.routers.strategy.generate_strategy_insight', new_callable=AsyncMock)
 def test_query_strategy_success(
     mock_generate_insight,
     mock_search_radio,
@@ -41,9 +42,9 @@ def test_query_strategy_success(
     assert data["telemetry"]["driver"] == "VER"
     assert data["radio_transcripts"][0]["text"] == "Push"
 
-@patch('app.routers.strategy.get_telemetry')
-def test_query_strategy_telemetry_error(mock_get_telemetry):
-    mock_get_telemetry.return_value = {"error": "Telemetry not found"}
+@patch('app.routers.strategy.get_telemetry_async', new_callable=AsyncMock)
+def test_query_strategy_telemetry_not_found(mock_get_telemetry):
+    mock_get_telemetry.side_effect = TelemetryNotFoundError("No laps found for VER")
 
     payload = {
         "year": 2023,
@@ -55,5 +56,17 @@ def test_query_strategy_telemetry_error(mock_get_telemetry):
 
     response = client.post("/api/v1/strategy/query", json=payload)
 
-    assert response.status_code == 400
-    assert response.json()["detail"] == "Telemetry not found"
+    assert response.status_code == 404
+    assert response.json()["detail"] == "No laps found for VER"
+
+def test_query_strategy_validation_error():
+    payload = {
+        "year": 1800,  # invalid year < 1950
+        "grand_prix": "Monza",
+        "session_type": "INVALID",  # invalid session
+        "driver_code": "VERSTAPPEN",  # invalid len > 3
+        "query": ""
+    }
+
+    response = client.post("/api/v1/strategy/query", json=payload)
+    assert response.status_code == 422

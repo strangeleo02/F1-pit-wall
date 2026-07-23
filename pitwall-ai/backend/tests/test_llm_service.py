@@ -1,34 +1,37 @@
+import asyncio
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from app.services.llm_service import generate_strategy_insight
+from app.exceptions import LLMGenerationError
 
-@patch('app.services.llm_service.client')
-def test_generate_strategy_insight_success(mock_client):
+def test_generate_strategy_insight_success():
+    mock_client = AsyncMock()
     mock_response = MagicMock()
     mock_choice = MagicMock()
     mock_choice.message.content = "Because his tires were degrading."
     mock_response.choices = [mock_choice]
-
     mock_client.chat.completions.create.return_value = mock_response
 
-    insight = generate_strategy_insight(
+    insight = asyncio.run(generate_strategy_insight(
+        mock_client,
         "Why pit?",
         {"max_speed_kph": 300},
         [{"text": "Tires are gone"}]
-    )
+    ))
 
     assert insight == "Because his tires were degrading."
     mock_client.chat.completions.create.assert_called_once()
 
-@patch('app.services.llm_service.client', None)
 def test_generate_strategy_insight_no_client():
-    insight = generate_strategy_insight("query", {}, [])
-    assert "not configured" in insight
+    with pytest.raises(LLMGenerationError) as exc_info:
+        asyncio.run(generate_strategy_insight(None, "query", {}, []))
+    assert "not configured" in str(exc_info.value)
 
-@patch('app.services.llm_service.client')
-def test_generate_strategy_insight_exception(mock_client):
+def test_generate_strategy_insight_exception():
+    mock_client = AsyncMock()
     mock_client.chat.completions.create.side_effect = Exception("API limit reached")
 
-    insight = generate_strategy_insight("query", {}, [])
+    with pytest.raises(LLMGenerationError) as exc_info:
+        asyncio.run(generate_strategy_insight(mock_client, "query", {}, []))
 
-    assert "Failed to generate insight" in insight
+    assert "Failed to generate insight" in str(exc_info.value)

@@ -10,12 +10,19 @@ This application combines numerical F1 telemetry via the `FastF1` Python library
 
 ## Quickstart
 
-1. **Clone the repository**
+1. **Install requirements**
+   - `pip install -r backend/requirements.txt`
 2. **Environment Variables**
    - Copy `.env.example` to `.env` and fill in your API keys (Groq, Qdrant).
-3. **Backend**
-   - Navigate to `backend/` and install requirements: `pip install -r requirements.txt`
-   - Run the FastAPI server: `uvicorn app.main:app --reload`
+3. **Run the Application**
+   - Run directly from the root directory:
+     ```bash
+     python run.py
+     ```
+   - Or navigate to `backend/` and run:
+     ```bash
+     uvicorn app.main:app --reload
+     ```
 
 ## Docker
 
