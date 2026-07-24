@@ -12,33 +12,17 @@ from app.services.vector_db import ensure_collection_exists
 
 def _background_warmup():
     """
-    Pre-import heavy libraries in a background thread AFTER the server port binds.
-    This eliminates the lazy-import tax on the first real API request:
-    - fastf1 + pandas + numpy  (~150MB, ~5-8s)
-    - sentence_transformers + PyTorch (~300MB, ~10-15s)
-    Called once from the lifespan startup handler.
+    Safely pre-initialize basic F1 libraries in a lightweight background thread.
+    PyTorch / SentenceTransformers model loading remains strictly lazy-loaded on demand
+    to prevent memory usage from exceeding Render's 512MB free limit.
     """
     try:
         print("🔥 [warmup] Pre-importing fastf1 + pandas + numpy...")
-        from app.services.f1_service import _ensure_f1_libs, get_season_schedule
+        from app.services.f1_service import _ensure_f1_libs
         _ensure_f1_libs()
-        print("✅ [warmup] fastf1 ready. Pre-loading season schedule caches...")
-        try:
-            get_season_schedule(2023)
-            get_season_schedule(2024)
-            print("✅ [warmup] 2023 & 2024 schedules pre-cached in memory.")
-        except Exception as sc_err:
-            print(f"⚠️ [warmup] Schedule pre-load warning: {sc_err}")
+        print("✅ [warmup] fastf1 ready.")
     except Exception as e:
         print(f"⚠️ [warmup] fastf1 import warning: {e}")
-
-    try:
-        print("🔥 [warmup] Pre-importing sentence_transformers + PyTorch...")
-        from app.services.embedding_service import get_embedding_model
-        get_embedding_model()
-        print("✅ [warmup] Embedding model ready.")
-    except Exception as e:
-        print(f"⚠️ [warmup] Embedding import warning: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
