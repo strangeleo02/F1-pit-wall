@@ -14,8 +14,7 @@ async def lifespan(app: FastAPI):
     FastAPI lifespan handler for startup initialization and graceful shutdown.
     """
     print("🏎️ Starting PitWall AI Backend...")
-    from app.services.embedding_service import get_embedding_model
-    get_embedding_model()
+    print("ℹ️ Embedding model will load lazily on first request to stay within memory limits.")
 
     if settings.QDRANT_URL and settings.QDRANT_API_KEY:
         try:
