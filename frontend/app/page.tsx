@@ -8,9 +8,7 @@ import { TelemetryCharts } from './components/TelemetryCharts';
 import { RadioTranscriptsFeed, RadioItem } from './components/RadioTranscriptsFeed';
 import { CircuitMap } from './components/CircuitMap';
 import { UndercutSimulator } from './components/UndercutSimulator';
-import { Send, Loader2, AlertCircle, Sparkles } from 'lucide-react';
-
-const BACKEND_URL = 'http://localhost:8000';
+import { API_BASE_URL, API_ENDPOINTS } from './config';
 
 const PRESETS = [
   'Why did Max complain about tire degradation on laps 15–20?',
@@ -50,7 +48,7 @@ export default function Home() {
   // ── Backend health check ─────────────────────────────────────
   const checkBackendHealth = async () => {
     try {
-      const res = await fetch(`${BACKEND_URL}/health`);
+      const res = await fetch(API_ENDPOINTS.HEALTH);
       setBackendConnected(res.ok);
     } catch {
       setBackendConnected(false);
@@ -62,7 +60,7 @@ export default function Home() {
   // ── F1 Calendar ─────────────────────────────────────────────
   useEffect(() => {
     setLoadingSchedule(true);
-    fetch(`${BACKEND_URL}/api/v1/meta/schedule?year=${params.year}`)
+    fetch(`${API_BASE_URL}/api/v1/meta/schedule?year=${params.year}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.events?.length > 0) {
@@ -85,7 +83,7 @@ export default function Home() {
   useEffect(() => {
     if (!params.grandPrix) return;
     setLoadingDrivers(true);
-    fetch(`${BACKEND_URL}/api/v1/meta/drivers?year=${params.year}&grand_prix=${encodeURIComponent(params.grandPrix)}&session_type=${params.sessionType}`)
+    fetch(`${API_BASE_URL}/api/v1/meta/drivers?year=${params.year}&grand_prix=${encodeURIComponent(params.grandPrix)}&session_type=${params.sessionType}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.drivers?.length > 0) {
@@ -101,7 +99,7 @@ export default function Home() {
   // ── Session Weather ──────────────────────────────────────────
   useEffect(() => {
     if (!params.grandPrix) return;
-    fetch(`${BACKEND_URL}/api/v1/meta/weather?year=${params.year}&grand_prix=${encodeURIComponent(params.grandPrix)}&session_type=${params.sessionType}`)
+    fetch(`${API_BASE_URL}/api/v1/meta/weather?year=${params.year}&grand_prix=${encodeURIComponent(params.grandPrix)}&session_type=${params.sessionType}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => { if (data) setSessionWeather(data); })
       .catch(() => {});
@@ -126,7 +124,7 @@ export default function Home() {
     setActiveTab('RACE_INTEL');
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/v1/strategy/stream`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/strategy/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

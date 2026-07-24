@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { MapPin, Timer } from "lucide-react";
+import { API_BASE_URL } from "../config";
 
 interface Corner {
   number: string;
@@ -39,7 +40,7 @@ export const CircuitMap: React.FC<CircuitMapProps> = ({
   const [circuitMeta, setCircuitMeta] = useState<CircuitData | null>(null);
   const [pitstopAvg, setPitstopAvg] = useState<string | null>(null);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const API_BASE = API_BASE_URL;
 
   // 1. Fetch landmark corners and pit stop benchmarks
   useEffect(() => {

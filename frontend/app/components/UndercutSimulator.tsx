@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Sliders, Flame, Gauge, CloudRain, CheckCircle2, XCircle, Activity, HeartPulse, Flag, Thermometer, Maximize2, X } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Brush } from "recharts";
+import { API_BASE_URL } from "../config";
 
 interface UndercutSimulatorProps {
   primaryDriver?: string;
@@ -36,7 +37,7 @@ export const UndercutSimulator: React.FC<UndercutSimulatorProps> = ({
   const [tyreDegData, setTyreDegData] = useState<any>(null);
   const [crossoverData, setCrossoverData] = useState<any>(null);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const API_BASE = API_BASE_URL;
 
   // Sync drivers when props update
   useEffect(() => {
