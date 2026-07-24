@@ -391,6 +391,12 @@ def get_telemetry(year: int, grand_prix: str, session_type: str, driver_code: st
                 json.dump(result, f)
         except Exception:
             pass
+
+        # Explicitly clean up heavy Pandas objects from memory
+        import gc
+        del session, driver_laps, fastest_lap, telemetry
+        gc.collect()
+
         return result
     except TelemetryNotFoundError:
         raise
