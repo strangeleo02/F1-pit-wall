@@ -1,17 +1,32 @@
 import os
 from typing import Any
-import fastf1
-import pandas as pd
-import numpy as np
 from fastapi.concurrency import run_in_threadpool
 from qdrant_client import AsyncQdrantClient
 from app.config import settings
 from app.exceptions import TelemetryNotFoundError, TelemetryFetchError
 
-# Configure FastF1 cache
-if not os.path.exists(settings.FASTF1_CACHE_DIR):
-    os.makedirs(settings.FASTF1_CACHE_DIR)
-fastf1.Cache.enable_cache(settings.FASTF1_CACHE_DIR)
+# Heavy libraries (fastf1, pandas, numpy) are imported lazily on first use
+# to keep startup memory well under Render's 512MB free tier limit.
+_f1_initialized = False
+fastf1 = None  # type: ignore[assignment]
+pd = None      # type: ignore[assignment]
+np = None      # type: ignore[assignment]
+
+def _ensure_f1_libs() -> None:
+    """Lazy-initialise fastf1/pandas/numpy exactly once on first real call."""
+    global fastf1, pd, np, _f1_initialized
+    if _f1_initialized:
+        return
+    import fastf1 as _fastf1
+    import pandas as _pd
+    import numpy as _np
+    fastf1 = _fastf1
+    pd = _pd
+    np = _np
+    if not os.path.exists(settings.FASTF1_CACHE_DIR):
+        os.makedirs(settings.FASTF1_CACHE_DIR)
+    fastf1.Cache.enable_cache(settings.FASTF1_CACHE_DIR)
+    _f1_initialized = True
 
 # In-memory result cache for parsed telemetry objects and metadata
 _MEMORY_TELEMETRY_CACHE: dict[tuple[int, str, str, str], dict] = {}
@@ -28,6 +43,7 @@ def get_season_schedule(year: int) -> list[dict]:
     """
     Returns the real official F1 calendar for a given season year using FastF1 event schedule.
     """
+    _ensure_f1_libs()
     if year in _SCHEDULE_CACHE:
         return _SCHEDULE_CACHE[year]
 
@@ -77,6 +93,7 @@ def get_session_drivers(year: int, grand_prix: str, session_type: str) -> list[d
     """
     Fetches the actual participating driver lineup for a specific race session.
     """
+    _ensure_f1_libs()
     cache_key = (year, str(grand_prix).lower().strip(), str(session_type).upper().strip())
     if cache_key in _DRIVERS_CACHE:
         return _DRIVERS_CACHE[cache_key]
@@ -156,6 +173,7 @@ def prewarm_session_cache(year: int, grand_prix: str, session_type: str) -> None
     """
     Pre-warms the FastF1 disk cache for a specific race session.
     """
+    _ensure_f1_libs()
     try:
         session = fastf1.get_session(year, grand_prix, session_type)
         session.load(telemetry=True, weather=False, messages=False)
@@ -230,6 +248,7 @@ def get_telemetry(year: int, grand_prix: str, session_type: str, driver_code: st
     Fetches comprehensive lap times and detailed time-series telemetry streams for a driver.
     Utilizes FastF1 disk cache and in-memory dict cache for sub-millisecond retrieval.
     """
+    _ensure_f1_libs()
     cache_key = (year, str(grand_prix).lower().strip(), str(session_type).upper().strip(), str(driver_code).upper().strip())
     if cache_key in _MEMORY_TELEMETRY_CACHE:
         return _MEMORY_TELEMETRY_CACHE[cache_key]
@@ -364,6 +383,7 @@ def get_session_weather_and_laps(year: int = 2024, grand_prix: str = "Monza", se
     Fetches real historical weather telemetry (AirTemp, TrackTemp, Humidity, Rainfall)
     and total session laps for a specific Year, Grand Prix, and Session from FastF1 API.
     """
+    _ensure_f1_libs()
     from typing import Any
     gp_norm = grand_prix.strip()
     cache_key = (year, gp_norm.lower(), session_type.lower())

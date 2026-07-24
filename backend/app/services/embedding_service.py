@@ -1,6 +1,5 @@
 import os
 import threading
-from sentence_transformers import SentenceTransformer
 from fastapi.concurrency import run_in_threadpool
 from app.config import settings
 
@@ -8,15 +7,18 @@ from app.config import settings
 _model = None
 _model_lock = threading.Lock()
 
-def get_embedding_model() -> SentenceTransformer:
+def get_embedding_model():
     """
     Returns the pre-loaded SentenceTransformer embedding model instance.
     Guaranteed thread-safe singleton: Loads model weights exactly ONCE into memory.
+    PyTorch and sentence_transformers are imported lazily here to avoid
+    ~300MB of memory being consumed at startup before any request arrives.
     """
     global _model
     if _model is None:
         with _model_lock:
             if _model is None:
+                from sentence_transformers import SentenceTransformer
                 print(f"📦 Loading embedding model '{settings.EMBEDDING_MODEL_NAME}' into memory (ONCE)...")
                 if settings.HF_TOKEN:
                     os.environ["HF_TOKEN"] = settings.HF_TOKEN
