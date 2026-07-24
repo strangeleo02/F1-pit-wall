@@ -267,6 +267,9 @@ def get_telemetry(year: int, grand_prix: str, session_type: str, driver_code: st
     Utilizes FastF1 disk cache and in-memory dict cache for sub-millisecond retrieval.
     """
     _ensure_f1_libs()
+    if year >= 2026:
+        raise TelemetryNotFoundError(f"Telemetry data for the {year} season is not yet available.")
+
     cache_key = (year, str(grand_prix).lower().strip(), str(session_type).upper().strip(), str(driver_code).upper().strip())
     if cache_key in _MEMORY_TELEMETRY_CACHE:
         return _MEMORY_TELEMETRY_CACHE[cache_key]

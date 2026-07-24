@@ -40,8 +40,6 @@ async def _orchestrate_retrieval_and_synthesis(
                 driver_code=request.driver_code,
                 qdrant_client=qdrant_client
             )
-        except PitWallException:
-            raise
         except Exception as e:
             print(f"Primary telemetry retrieval warning: {e}")
             return {}
