@@ -1,3 +1,4 @@
+import json
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,10 +41,20 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+def _parse_cors_origins(raw: str) -> list[str]:
+    """Parse CORS_ORIGINS env var — handles JSON array, comma-separated, or plain '*'."""
+    raw = raw.strip()
+    if raw.startswith("["):
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            pass
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=_parse_cors_origins(settings.CORS_ORIGINS),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
