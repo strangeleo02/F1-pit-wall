@@ -61,7 +61,7 @@ async def _orchestrate_retrieval_and_synthesis(
 
     async def fetch_radio_context():
         # Only search radio transcripts if intent is related to radio or multi-modal query
-        if intent not in (QueryIntent.RADIO_ANALYSIS, QueryIntent.MULTI_MODAL_RAG, QueryIntent.GENERAL):
+        if intent not in (QueryIntent.RADIO_ONLY, QueryIntent.MULTI_MODAL_RAG, QueryIntent.STEWARD_DECISION):
             return []
 
         try:
@@ -156,7 +156,7 @@ async def stream_strategy(
     Completely crash-proof: Handles orchestration exceptions, missing keys, and future season years cleanly.
     """
     async def sse_event_generator():
-        intent = QueryIntent.TELEMETRY_ANALYSIS
+        intent = QueryIntent.TELEMETRY_ONLY
         telemetry_data = {}
         radio_context = []
         system_prompt = ""
