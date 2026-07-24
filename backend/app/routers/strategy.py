@@ -62,6 +62,10 @@ async def _orchestrate_retrieval_and_synthesis(
         return None
 
     async def fetch_radio_context():
+        # Only search radio transcripts if intent is related to radio or multi-modal query
+        if intent not in (QueryIntent.RADIO_ANALYSIS, QueryIntent.MULTI_MODAL_RAG, QueryIntent.GENERAL):
+            return []
+
         try:
             query_embedding = await generate_embedding_async(request.query)
             radio = await search_radio_transcripts(
@@ -72,22 +76,8 @@ async def _orchestrate_retrieval_and_synthesis(
                 session=request.session_type,
                 grand_prix=request.grand_prix
             )
-            if not radio and qdrant_client:
-                pipeline = RadioIngestionPipeline(qdrant_client=qdrant_client)
-                await pipeline.ingest_session(
-                    year=request.year,
-                    grand_prix=request.grand_prix,
-                    session_type=request.session_type
-                )
-                radio = await search_radio_transcripts(
-                    client=qdrant_client,
-                    query_embedding=query_embedding,
-                    driver=request.driver_code,
-                    year=request.year,
-                    session=request.session_type,
-                    grand_prix=request.grand_prix
-                )
-            return radio
+            # Return search results immediately — avoid heavy synchronous on-demand ingestion during streaming
+            return radio or []
         except Exception as e:
             print(f"Radio context search warning: {e}")
             return []
