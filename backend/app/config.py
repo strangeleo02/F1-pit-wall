@@ -1,6 +1,8 @@
 from pathlib import Path
 from dotenv import load_dotenv
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+import json
 
 # Pre-load environment variables from all possible root paths
 _BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,7 +23,7 @@ class Settings(BaseSettings):
     # Groq Settings
     GROQ_MODEL_NAME: str = "llama-3.3-70b-versatile"
 
-    # CORS Settings
+    # CORS Settings — accepts: "*", ["*"], or "https://a.com,https://b.com"
     CORS_ORIGINS: list[str] = ["*"]
 
     # FastF1 Settings
@@ -29,6 +31,23 @@ class Settings(BaseSettings):
 
     # Embedding Settings
     EMBEDDING_MODEL_NAME: str = "all-MiniLM-L6-v2"
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v):
+        if isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            v = v.strip()
+            # Handle JSON array string: ["https://foo.com", "*"]
+            if v.startswith("["):
+                try:
+                    return json.loads(v)
+                except json.JSONDecodeError:
+                    pass
+            # Handle comma-separated: https://foo.com,https://bar.com
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
 
     model_config = SettingsConfigDict(
         env_file=(".env", str(_BASE_DIR / ".env"), str(_BASE_DIR.parent / ".env")),
