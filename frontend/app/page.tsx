@@ -8,6 +8,7 @@ import { TelemetryCharts } from './components/TelemetryCharts';
 import { RadioTranscriptsFeed, RadioItem } from './components/RadioTranscriptsFeed';
 import { CircuitMap } from './components/CircuitMap';
 import { UndercutSimulator } from './components/UndercutSimulator';
+import { Send, Loader2, AlertCircle, Sparkles } from 'lucide-react';
 import { API_BASE_URL, API_ENDPOINTS } from './config';
 
 const PRESETS = [
