@@ -1,0 +1,91 @@
+# ============================================================
+# F1 Pit Wall - Root .gitignore
+# Covers both /backend (Python/FastAPI) and /frontend (Next.js)
+# ============================================================
+
+# -----------------------------------------------
+# SECRETS & ENV FILES (Never commit these!)
+# -----------------------------------------------
+.env
+.env.*
+!.env.example
+
+# -----------------------------------------------
+# PYTHON / BACKEND
+# -----------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
+
+# -----------------------------------------------
+# FASTF1 CACHE (large binary data, regenerable)
+# -----------------------------------------------
+backend/cache/
+pitwall-ai/cache/
+cache/
+
+# -----------------------------------------------
+# NODE / FRONTEND
+# -----------------------------------------------
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Next.js build output
+.next/
+out/
+build/
+coverage/
+
+# TypeScript build info
+*.tsbuildinfo
+next-env.d.ts
+
+# -----------------------------------------------
+# MISC / EDITOR / OS
+# -----------------------------------------------
+.DS_Store
+Thumbs.db
+*.pem
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Vercel
+.vercel
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo

@@ -1,0 +1,327 @@
+/* ─────────────────────────────────────────────────────────────
+   PitWall AI — Global Stylesheet
+   F1-native design system. Clean, minimal, dark.
+   ───────────────────────────────────────────────────────────── */
+@import "tailwindcss";
+
+
+/* ── Design Tokens ─────────────────────────────────────────── */
+:root {
+  /* F1 brand palette */
+  --f1-red:      #E10600;
+  --f1-red-dim:  rgba(225, 6, 0, 0.12);
+  --f1-red-glow: rgba(225, 6, 0, 0.25);
+
+  /* Surfaces */
+  --bg:          #0D0D0D;
+  --surface-0:   #111111;
+  --surface-1:   #181818;
+  --surface-2:   #1F1F1F;
+  --surface-3:   #272727;
+
+  /* Borders */
+  --border-dim:  rgba(255, 255, 255, 0.06);
+  --border-mid:  rgba(255, 255, 255, 0.10);
+  --border-hi:   rgba(255, 255, 255, 0.16);
+
+  /* Text */
+  --text-primary:   #F5F5F5;
+  --text-secondary: #9A9A9A;
+  --text-muted:     #5A5A5A;
+
+  /* Tab bar */
+  --tab-active:  #E10600;
+  --tab-inactive: #5A5A5A;
+
+  /* Team accent palette */
+  --team-ferrari:     #E8002D;
+  --team-mercedes:    #27F4D2;
+  --team-redbull:     #3671C6;
+  --team-mclaren:     #FF8000;
+  --team-astonmartin: #229971;
+  --team-williams:    #64C4FF;
+  --team-alpine:      #0093CC;
+  --team-sauber:      #52E252;
+  --team-haas:        #B6BABD;
+  --team-vcarb:       #6692FF;
+}
+
+/* ── Base Reset ────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-x: hidden;
+  /* Subtle carbon diagonal grid — very low opacity */
+  background-image:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.012) 0px,
+      rgba(255, 255, 255, 0.012) 1px,
+      transparent 0px,
+      transparent 50%
+    );
+  background-size: 20px 20px;
+}
+
+/* ── Typography ────────────────────────────────────────────── */
+.font-mono, code, pre {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ── Scrollbars ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--f1-red); }
+
+/* ── Surfaces ──────────────────────────────────────────────── */
+.f1-surface {
+  background: var(--surface-1);
+  border: 1px solid var(--border-dim);
+  border-radius: 8px;
+}
+
+.f1-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border-mid);
+  border-radius: 10px;
+  transition: border-color 0.15s ease;
+}
+
+.f1-card:hover {
+  border-color: var(--border-hi);
+}
+
+/* ── Tab system ────────────────────────────────────────────── */
+.f1-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  height: 100%;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tab-inactive);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+
+.f1-tab:hover {
+  color: var(--text-secondary);
+}
+
+.f1-tab.active {
+  color: var(--text-primary);
+}
+
+.f1-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--f1-red);
+  border-radius: 1px 1px 0 0;
+}
+
+/* ── Inputs ────────────────────────────────────────────────── */
+.f1-input {
+  background: var(--surface-1);
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  color: var(--text-primary);
+  padding: 10px 14px;
+  font-size: 13px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s ease;
+  font-family: 'Inter', sans-serif;
+}
+
+.f1-input:focus {
+  border-color: var(--f1-red);
+  box-shadow: 0 0 0 1px rgba(225, 6, 0, 0.2);
+}
+
+.f1-input::placeholder {
+  color: var(--text-muted);
+}
+
+.f1-select {
+  background: var(--surface-1);
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  color: var(--text-primary);
+  padding: 10px 14px;
+  font-size: 13px;
+  width: 100%;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+  font-family: 'JetBrains Mono', monospace;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235A5A5A' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.f1-select:focus {
+  border-color: var(--f1-red);
+}
+
+.f1-select option {
+  background: #1a1a1a;
+  color: #f5f5f5;
+}
+
+/* ── Buttons ───────────────────────────────────────────────── */
+.f1-btn-primary {
+  background: var(--f1-red);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 24px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+  font-family: 'Inter', sans-serif;
+}
+
+.f1-btn-primary:hover:not(:disabled) {
+  background: #c20600;
+}
+
+.f1-btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.f1-btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.f1-btn-ghost:hover {
+  border-color: var(--border-hi);
+  color: var(--text-primary);
+}
+
+/* ── Status indicators ─────────────────────────────────────── */
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot.online {
+  background: #22C55E;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+  animation: pulse-dot 2s infinite;
+}
+
+.status-dot.offline {
+  background: #EF4444;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ── Pill badges ───────────────────────────────────────────── */
+.f1-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-family: 'JetBrains Mono', monospace;
+  border: 1px solid transparent;
+}
+
+.f1-pill.red    { background: rgba(225, 6, 0, 0.12);   color: #FF6B6B; border-color: rgba(225,6,0,0.25); }
+.f1-pill.green  { background: rgba(34, 197, 94, 0.10); color: #4ADE80; border-color: rgba(34,197,94,0.20); }
+.f1-pill.amber  { background: rgba(245, 158, 11, 0.10); color: #FCD34D; border-color: rgba(245,158,11,0.20); }
+.f1-pill.cyan   { background: rgba(39, 244, 210, 0.10); color: #27F4D2; border-color: rgba(39,244,210,0.20); }
+.f1-pill.purple { background: rgba(168, 85, 247, 0.10); color: #C084FC; border-color: rgba(168,85,247,0.20); }
+.f1-pill.muted  { background: var(--surface-2); color: var(--text-muted); border-color: var(--border-dim); }
+
+/* ── Track status flags ────────────────────────────────────── */
+.flag-green  { color: #22C55E; }
+.flag-yellow { color: #EAB308; animation: flag-pulse 1s infinite; }
+.flag-red    { color: #EF4444; animation: flag-pulse 0.7s infinite; }
+.flag-sc     { color: #F59E0B; animation: flag-pulse 1.2s infinite; }
+.flag-vsc    { color: #38BDF8; }
+
+@keyframes flag-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ── Streaming text cursor ─────────────────────────────────── */
+.stream-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 14px;
+  background: var(--f1-red);
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: blink 0.8s step-end infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+/* ── Divider ───────────────────────────────────────────────── */
+.f1-divider {
+  height: 1px;
+  background: var(--border-dim);
+  width: 100%;
+}
+
+/* ── Legacy compatibility aliases ──────────────────────────── */
+.glass-panel {
+  background: var(--surface-1);
+  border: 1px solid var(--border-mid);
+}
