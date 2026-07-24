@@ -4,6 +4,11 @@ import React, { useEffect, useState, useMemo } from "react";
 import { MapPin, Timer } from "lucide-react";
 import { API_BASE_URL } from "../config";
 
+// Module-level cache — survives re-renders, cleared only on page reload.
+// Circuit data and pitstop averages are static historical data; no need to refetch.
+const _circuitCache = new Map<string, any>();
+const _pitstopCache = new Map<number, string | null>();
+
 interface Corner {
   number: string;
   name: string;
@@ -42,37 +47,50 @@ export const CircuitMap: React.FC<CircuitMapProps> = ({
 
   const API_BASE = API_BASE_URL;
 
-  // 1. Fetch landmark corners and pit stop benchmarks
+  // Fetch circuit landmark corners and pit stop benchmarks — cached per (grandPrix, year)
   useEffect(() => {
     let isMounted = true;
 
-    fetch(`${API_BASE}/api/v1/meta/circuit?grand_prix=${encodeURIComponent(grandPrix)}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (isMounted && data) {
-          setCircuitMeta(data);
-        }
-      })
-      .catch((err) => console.warn("Circuit meta fetch error:", err));
-
-    fetch(`${API_BASE}/api/v1/history/pitstops?year=${year}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (isMounted && data && data.pitstops && data.pitstops.length > 0) {
-          const validStops = data.pitstops
-            .map((s: any) => parseFloat(s.duration))
-            .filter((d: number) => !isNaN(d) && d > 1.5 && d < 15.0);
-          if (validStops.length > 0) {
-            const avg = validStops.reduce((a: number, b: number) => a + b, 0) / validStops.length;
-            setPitstopAvg(avg.toFixed(2));
+    // Circuit meta — keyed by grandPrix (track layout doesn't change year-to-year)
+    if (_circuitCache.has(grandPrix)) {
+      setCircuitMeta(_circuitCache.get(grandPrix));
+    } else {
+      fetch(`${API_BASE}/api/v1/meta/circuit?grand_prix=${encodeURIComponent(grandPrix)}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (isMounted && data) {
+            _circuitCache.set(grandPrix, data);
+            setCircuitMeta(data);
           }
-        }
-      })
-      .catch(() => {});
+        })
+        .catch((err) => console.warn("Circuit meta fetch error:", err));
+    }
 
-    return () => {
-      isMounted = false;
-    };
+    // Pitstop averages — keyed by year
+    if (_pitstopCache.has(year)) {
+      setPitstopAvg(_pitstopCache.get(year) ?? null);
+    } else {
+      fetch(`${API_BASE}/api/v1/history/pitstops?year=${year}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (isMounted && data?.pitstops?.length > 0) {
+            const validStops = data.pitstops
+              .map((s: any) => parseFloat(s.duration))
+              .filter((d: number) => !isNaN(d) && d > 1.5 && d < 15.0);
+            if (validStops.length > 0) {
+              const avg = validStops.reduce((a: number, b: number) => a + b, 0) / validStops.length;
+              const avgStr = avg.toFixed(2);
+              _pitstopCache.set(year, avgStr);
+              if (isMounted) setPitstopAvg(avgStr);
+            } else {
+              _pitstopCache.set(year, null);
+            }
+          }
+        })
+        .catch(() => {});
+    }
+
+    return () => { isMounted = false; };
   }, [grandPrix, year]);
 
   // Helper engine to fit ANY set of 2D points to fill the 500x320 SVG canvas full-size

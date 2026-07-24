@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Sliders, Flame, Gauge, CloudRain, CheckCircle2, XCircle, Activity, HeartPulse, Flag, Thermometer, Maximize2, X } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Brush } from "recharts";
 import { API_BASE_URL } from "../config";
@@ -10,13 +10,16 @@ interface UndercutSimulatorProps {
   comparisonDriver?: string;
   grandPrix?: string;
   year?: number;
+  /** Pass already-fetched weather from parent to avoid a duplicate API call */
+  sessionWeatherProp?: any;
 }
 
 export const UndercutSimulator: React.FC<UndercutSimulatorProps> = ({
   primaryDriver = "VER",
   comparisonDriver = "HAM",
   grandPrix = "Monza",
-  year = 2024
+  year = 2024,
+  sessionWeatherProp
 }) => {
   // Input Controls State
   const [targetDriver, setTargetDriver] = useState<string>(primaryDriver);
@@ -45,8 +48,18 @@ export const UndercutSimulator: React.FC<UndercutSimulatorProps> = ({
     if (comparisonDriver) setRivalDriver(comparisonDriver);
   }, [primaryDriver, comparisonDriver]);
 
-  // 1. Fetch Real Session Weather & Lap Count from FastF1 API for the given Year + GrandPrix
+  // 1. Use weather from parent prop if available, otherwise fetch once per (year, grandPrix)
   useEffect(() => {
+    if (sessionWeatherProp) {
+      // Reuse already-fetched data from page.tsx — no extra API call
+      setSessionWeather(sessionWeatherProp);
+      if (sessionWeatherProp.track_temp_celsius) setTrackTemp(sessionWeatherProp.track_temp_celsius);
+      if (sessionWeatherProp.rainfall_intensity_mm_per_min !== undefined)
+        setRainIntensity(sessionWeatherProp.rainfall_intensity_mm_per_min);
+      return;
+    }
+
+    // Fallback: fetch directly only if prop not provided
     let isMounted = true;
     fetch(`${API_BASE}/api/v1/simulation/session-weather?year=${year}&grand_prix=${encodeURIComponent(grandPrix)}&session_type=Race`)
       .then((res) => (res.ok ? res.json() : null))
@@ -58,62 +71,62 @@ export const UndercutSimulator: React.FC<UndercutSimulatorProps> = ({
         }
       })
       .catch((err) => console.warn("Session weather API fetch warning:", err));
+    return () => { isMounted = false; };
+  }, [year, grandPrix, sessionWeatherProp]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [year, grandPrix]);
+  // 2. Run Undercut Simulation & Tyre Deg — debounced 500ms to prevent API flood on slider drag
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 2. Run Undercut Simulation & Tyre Deg calculations
   useEffect(() => {
+    // Cancel any pending debounced call
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
     let isMounted = true;
 
-    // Run Undercut Simulation
-    fetch(`${API_BASE}/api/v1/simulation/undercut`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        target_driver: targetDriver,
-        rival_driver: rivalDriver,
-        grand_prix: grandPrix,
-        current_lap: currentLap,
-        target_pit_lap: targetPitLap,
-        initial_gap_sec: initialGap,
-        stationary_pit_duration: pitDuration,
-        target_new_tyre: targetNewTyre,
-        track_temp_celsius: trackTemp
-      })
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (isMounted && data) setSimulationResult(data);
-      })
-      .catch((err) => console.warn("Undercut sim error:", err));
+    debounceRef.current = setTimeout(() => {
+      if (!isMounted) return;
 
-    // Fetch Track-Calibrated Tyre Degradation Wear Curves (SOFT, MEDIUM, HARD)
-    fetch(
-      `${API_BASE}/api/v1/simulation/tyre-deg?compound=${encodeURIComponent(
-        targetNewTyre
-      )}&grand_prix=${encodeURIComponent(grandPrix)}&stint_laps=30&track_temp_celsius=${trackTemp}`
-    )
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (isMounted && data) setTyreDegData(data);
+      // Run Undercut Simulation
+      fetch(`${API_BASE}/api/v1/simulation/undercut`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          target_driver: targetDriver,
+          rival_driver: rivalDriver,
+          grand_prix: grandPrix,
+          current_lap: currentLap,
+          target_pit_lap: targetPitLap,
+          initial_gap_sec: initialGap,
+          stationary_pit_duration: pitDuration,
+          target_new_tyre: targetNewTyre,
+          track_temp_celsius: trackTemp
+        })
       })
-      .catch(() => {});
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => { if (isMounted && data) setSimulationResult(data); })
+        .catch((err) => console.warn("Undercut sim error:", err));
 
-    // Fetch Weather & Crossover Analysis
-    fetch(
-      `${API_BASE}/api/v1/simulation/crossover?rainfall_mm_per_min=${rainIntensity}&track_temp_celsius=${trackTemp}`
-    )
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (isMounted && data) setCrossoverData(data);
-      })
-      .catch(() => {});
+      // Tyre Degradation Curves (SOFT, MEDIUM, HARD)
+      fetch(
+        `${API_BASE}/api/v1/simulation/tyre-deg?compound=${encodeURIComponent(targetNewTyre)}&grand_prix=${encodeURIComponent(grandPrix)}&stint_laps=30&track_temp_celsius=${trackTemp}`
+      )
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => { if (isMounted && data) setTyreDegData(data); })
+        .catch(() => {});
+
+      // Weather Crossover Analysis
+      fetch(
+        `${API_BASE}/api/v1/simulation/crossover?rainfall_mm_per_min=${rainIntensity}&track_temp_celsius=${trackTemp}`
+      )
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => { if (isMounted && data) setCrossoverData(data); })
+        .catch(() => {});
+
+    }, 500); // 500ms debounce — waits until slider stops moving
 
     return () => {
       isMounted = false;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [
     targetDriver,

@@ -11,6 +11,12 @@ import { UndercutSimulator } from './components/UndercutSimulator';
 import { Send, Loader2, AlertCircle, Sparkles } from 'lucide-react';
 import { API_BASE_URL, API_ENDPOINTS } from './config';
 
+// Module-level caches — persist for the entire browser session.
+// Avoids re-fetching identical data when the user switches tabs or tweaks params.
+const _scheduleCache = new Map<number, any[]>();
+const _driversCache = new Map<string, any[]>();
+const _weatherCache = new Map<string, any>();
+
 const PRESETS = [
   'Why did Max complain about tire degradation on laps 15–20?',
   'Compare Hamilton vs Verstappen speed profile at Monza',
@@ -46,25 +52,65 @@ export default function Home() {
   const [hoverDistancePct, setHoverDistancePct] = useState<number | null>(null);
   const queryRef = useRef<HTMLInputElement>(null);
 
-  // ── Backend health check ─────────────────────────────────────
+  // ── Backend health check + warmup ping ───────────────────────
   const checkBackendHealth = async () => {
     try {
       const res = await fetch(API_ENDPOINTS.HEALTH);
       setBackendConnected(res.ok);
+      if (res.ok) {
+        // Fire a warmup ping to trigger lazy imports on the backend
+        // so the first real user request doesn't pay the import tax.
+        fetch(`${API_BASE_URL}/api/v1/meta/schedule?year=${params.year}`)
+          .then((r) => r.ok ? r.json() : null)
+          .then((data) => {
+            if (data?.events?.length > 0) {
+              _scheduleCache.set(params.year, data.events);
+              setScheduleEvents(data.events);
+              const validCompleted = data.events.filter((ev: ScheduleEvent) => ev.has_passed !== false);
+              const currentValid = data.events.find(
+                (ev: ScheduleEvent) => (ev.search_key === params.grandPrix || ev.location === params.grandPrix) && ev.has_passed !== false
+              );
+              if (!currentValid && validCompleted.length > 0) {
+                const fallbackEv = validCompleted[validCompleted.length - 1];
+                setParams((p) => ({ ...p, grandPrix: fallbackEv.search_key || fallbackEv.location }));
+              }
+            }
+          })
+          .catch(() => {})
+          .finally(() => setLoadingSchedule(false));
+      }
     } catch {
       setBackendConnected(false);
     }
   };
 
-  useEffect(() => { checkBackendHealth(); }, []);
-
-  // ── F1 Calendar ─────────────────────────────────────────────
   useEffect(() => {
+    setLoadingSchedule(true);
+    checkBackendHealth();
+  }, []);
+
+  // ── F1 Calendar (cache-first, warmup handles the initial fetch) ──
+  useEffect(() => {
+    if (_scheduleCache.has(params.year)) {
+      const cached = _scheduleCache.get(params.year)!;
+      setScheduleEvents(cached);
+      const validCompleted = cached.filter((ev: ScheduleEvent) => ev.has_passed !== false);
+      const currentValid = cached.find(
+        (ev: ScheduleEvent) => (ev.search_key === params.grandPrix || ev.location === params.grandPrix) && ev.has_passed !== false
+      );
+      if (!currentValid && validCompleted.length > 0) {
+        const fallbackEv = validCompleted[validCompleted.length - 1];
+        setParams((p) => ({ ...p, grandPrix: fallbackEv.search_key || fallbackEv.location }));
+      }
+      return;
+    }
+    // Not cached yet — fetch directly (year changed)
     setLoadingSchedule(true);
     fetch(`${API_BASE_URL}/api/v1/meta/schedule?year=${params.year}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.events?.length > 0) {
+          _scheduleCache.set(params.year, data.events);
           setScheduleEvents(data.events);
           const validCompleted = data.events.filter((ev: ScheduleEvent) => ev.has_passed !== false);
           const currentValid = data.events.find(
@@ -80,31 +126,74 @@ export default function Home() {
       .finally(() => setLoadingSchedule(false));
   }, [params.year]);
 
-  // ── Driver Lineup ────────────────────────────────────────────
+  // ── Drivers + Weather in parallel (cache-first, AbortController timeout) ──
   useEffect(() => {
     if (!params.grandPrix) return;
-    setLoadingDrivers(true);
-    fetch(`${API_BASE_URL}/api/v1/meta/drivers?year=${params.year}&grand_prix=${encodeURIComponent(params.grandPrix)}&session_type=${params.sessionType}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.drivers?.length > 0) {
-          setDriverLineup(data.drivers);
-          const exists = data.drivers.some((d: DriverItem) => d.code === params.driverCode);
-          if (!exists) setParams((p) => ({ ...p, driverCode: data.drivers[0].code }));
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoadingDrivers(false));
+
+    const driversKey = `${params.year}|${params.grandPrix}|${params.sessionType}`;
+    const weatherKey = `${params.year}|${params.grandPrix}`;
+
+    const needDrivers = !_driversCache.has(driversKey);
+    const needWeather = !_weatherCache.has(weatherKey);
+
+    // Serve from cache immediately
+    if (!needDrivers) {
+      const cached = _driversCache.get(driversKey)!;
+      setDriverLineup(cached);
+      const exists = cached.some((d: DriverItem) => d.code === params.driverCode);
+      if (!exists && cached.length > 0) setParams((p) => ({ ...p, driverCode: cached[0].code }));
+    }
+    if (!needWeather) {
+      setSessionWeather(_weatherCache.get(weatherKey));
+    }
+    if (!needDrivers && !needWeather) return;
+
+    // Fetch missing data in parallel with a 15s timeout
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+
+    setLoadingDrivers(needDrivers);
+
+    const fetches: Promise<void>[] = [];
+
+    if (needDrivers) {
+      fetches.push(
+        fetch(`${API_BASE_URL}/api/v1/meta/drivers?year=${params.year}&grand_prix=${encodeURIComponent(params.grandPrix)}&session_type=${params.sessionType}`, { signal: controller.signal })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            if (data?.drivers?.length > 0) {
+              _driversCache.set(driversKey, data.drivers);
+              setDriverLineup(data.drivers);
+              const exists = data.drivers.some((d: DriverItem) => d.code === params.driverCode);
+              if (!exists) setParams((p) => ({ ...p, driverCode: data.drivers[0].code }));
+            }
+          })
+          .catch(() => {})
+      );
+    }
+
+    if (needWeather) {
+      fetches.push(
+        fetch(`${API_BASE_URL}/api/v1/meta/weather?year=${params.year}&grand_prix=${encodeURIComponent(params.grandPrix)}&session_type=${params.sessionType}`, { signal: controller.signal })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            if (data) {
+              _weatherCache.set(weatherKey, data);
+              setSessionWeather(data);
+            }
+          })
+          .catch(() => {})
+      );
+    }
+
+    Promise.all(fetches).finally(() => {
+      clearTimeout(timer);
+      setLoadingDrivers(false);
+    });
+
+    return () => { controller.abort(); clearTimeout(timer); };
   }, [params.year, params.grandPrix, params.sessionType]);
 
-  // ── Session Weather ──────────────────────────────────────────
-  useEffect(() => {
-    if (!params.grandPrix) return;
-    fetch(`${API_BASE_URL}/api/v1/meta/weather?year=${params.year}&grand_prix=${encodeURIComponent(params.grandPrix)}&session_type=${params.sessionType}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (data) setSessionWeather(data); })
-      .catch(() => {});
-  }, [params.year, params.grandPrix, params.sessionType]);
 
   // ── Query execution ──────────────────────────────────────────
   const executeQuery = async () => {
@@ -226,6 +315,7 @@ export default function Home() {
             comparisonDriver={params.comparisonDriverCode}
             grandPrix={params.grandPrix}
             year={params.year}
+            sessionWeatherProp={sessionWeather}
           />
         );
 

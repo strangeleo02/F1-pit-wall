@@ -1,4 +1,5 @@
 import json
+import threading
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,13 +10,36 @@ from app.exceptions import PitWallException, pitwall_exception_handler
 from app.routers import strategy, meta, history, simulation, eval
 from app.services.vector_db import ensure_collection_exists
 
+def _background_warmup():
+    """
+    Pre-import heavy libraries in a background thread AFTER the server port binds.
+    This eliminates the lazy-import tax on the first real API request:
+    - fastf1 + pandas + numpy  (~150MB, ~5-8s)
+    - sentence_transformers + PyTorch (~300MB, ~10-15s)
+    Called once from the lifespan startup handler.
+    """
+    try:
+        print("🔥 [warmup] Pre-importing fastf1 + pandas + numpy...")
+        from app.services.f1_service import _ensure_f1_libs
+        _ensure_f1_libs()
+        print("✅ [warmup] fastf1 ready.")
+    except Exception as e:
+        print(f"⚠️ [warmup] fastf1 import warning: {e}")
+
+    try:
+        print("🔥 [warmup] Pre-importing sentence_transformers + PyTorch...")
+        from app.services.embedding_service import get_embedding_model
+        get_embedding_model()
+        print("✅ [warmup] Embedding model ready.")
+    except Exception as e:
+        print(f"⚠️ [warmup] Embedding import warning: {e}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     FastAPI lifespan handler for startup initialization and graceful shutdown.
     """
     print("🏎️ Starting PitWall AI Backend...")
-    print("ℹ️ Embedding model will load lazily on first request to stay within memory limits.")
 
     if settings.QDRANT_URL and settings.QDRANT_API_KEY:
         try:
@@ -30,6 +54,11 @@ async def lifespan(app: FastAPI):
             print(f"⚠️ Qdrant startup warning: {e}")
     else:
         print("⚠️ Qdrant credentials not configured in environment.")
+
+    # Kick off heavy-library warmup in a daemon thread so it doesn't block
+    # the port from binding. First real requests will be fast once this completes.
+    warmup_thread = threading.Thread(target=_background_warmup, daemon=True, name="lib-warmup")
+    warmup_thread.start()
 
     yield
     print("🛑 Shutting down PitWall AI Backend...")

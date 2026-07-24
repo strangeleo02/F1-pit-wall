@@ -18,7 +18,7 @@ async def get_pitstops(
 @router.get("/history/standings", summary="Get World Championship standings")
 async def get_standings(
     year: int = Query(2023, ge=1950, le=2026),
-    category: str = Query("driver", regex="^(driver|constructor)$")
+    category: str = Query("driver", pattern="^(driver|constructor)$")
 ):
     """
     Fetches historical Driver or Constructor Championship standings.
