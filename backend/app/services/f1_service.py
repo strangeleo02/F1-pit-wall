@@ -253,6 +253,22 @@ def get_telemetry(year: int, grand_prix: str, session_type: str, driver_code: st
     if cache_key in _MEMORY_TELEMETRY_CACHE:
         return _MEMORY_TELEMETRY_CACHE[cache_key]
 
+    # Level 1.5: Disk JSON cache check
+    import json
+    cache_dir = os.path.join(settings.FASTF1_CACHE_DIR, "parsed_telemetry")
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir, exist_ok=True)
+
+    disk_file = os.path.join(cache_dir, f"tel_{year}_{grand_prix.lower().strip()}_{session_type.lower().strip()}_{driver_code.lower().strip()}.json")
+    if os.path.exists(disk_file):
+        try:
+            with open(disk_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                _MEMORY_TELEMETRY_CACHE[cache_key] = data
+                return data
+        except Exception:
+            pass
+
     try:
         # Load the session
         session = fastf1.get_session(year, grand_prix, session_type)
@@ -370,6 +386,11 @@ def get_telemetry(year: int, grand_prix: str, session_type: str, driver_code: st
             "laps": laps_data
         }
         _MEMORY_TELEMETRY_CACHE[cache_key] = result
+        try:
+            with open(disk_file, "w", encoding="utf-8") as f:
+                json.dump(result, f)
+        except Exception:
+            pass
         return result
     except TelemetryNotFoundError:
         raise

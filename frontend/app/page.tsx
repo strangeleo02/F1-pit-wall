@@ -89,21 +89,29 @@ export default function Home() {
     checkBackendHealth();
   }, []);
 
-  // ── F1 Calendar (cache-first, warmup handles the initial fetch) ──
+  // ── F1 Calendar (localStorage & cache-first, warmup handles initial fetch) ──
   useEffect(() => {
+    // 1. Try in-memory cache
     if (_scheduleCache.has(params.year)) {
       const cached = _scheduleCache.get(params.year)!;
       setScheduleEvents(cached);
-      const validCompleted = cached.filter((ev: ScheduleEvent) => ev.has_passed !== false);
-      const currentValid = cached.find(
-        (ev: ScheduleEvent) => (ev.search_key === params.grandPrix || ev.location === params.grandPrix) && ev.has_passed !== false
-      );
-      if (!currentValid && validCompleted.length > 0) {
-        const fallbackEv = validCompleted[validCompleted.length - 1];
-        setParams((p) => ({ ...p, grandPrix: fallbackEv.search_key || fallbackEv.location }));
-      }
       return;
     }
+
+    // 2. Try localStorage for 0ms instant render on refresh
+    try {
+      const localData = localStorage.getItem(`f1_schedule_${params.year}`);
+      if (localData) {
+        const parsed = JSON.parse(localData);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          _scheduleCache.set(params.year, parsed);
+          setScheduleEvents(parsed);
+          setLoadingSchedule(false);
+          return;
+        }
+      }
+    } catch {}
+
     // Not cached yet — fetch directly (year changed)
     setLoadingSchedule(true);
     fetch(`${API_BASE_URL}/api/v1/meta/schedule?year=${params.year}`)
@@ -111,6 +119,7 @@ export default function Home() {
       .then((data) => {
         if (data?.events?.length > 0) {
           _scheduleCache.set(params.year, data.events);
+          try { localStorage.setItem(`f1_schedule_${params.year}`, JSON.stringify(data.events)); } catch {}
           setScheduleEvents(data.events);
           const validCompleted = data.events.filter((ev: ScheduleEvent) => ev.has_passed !== false);
           const currentValid = data.events.find(

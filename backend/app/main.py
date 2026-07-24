@@ -20,9 +20,15 @@ def _background_warmup():
     """
     try:
         print("🔥 [warmup] Pre-importing fastf1 + pandas + numpy...")
-        from app.services.f1_service import _ensure_f1_libs
+        from app.services.f1_service import _ensure_f1_libs, get_season_schedule
         _ensure_f1_libs()
-        print("✅ [warmup] fastf1 ready.")
+        print("✅ [warmup] fastf1 ready. Pre-loading season schedule caches...")
+        try:
+            get_season_schedule(2023)
+            get_season_schedule(2024)
+            print("✅ [warmup] 2023 & 2024 schedules pre-cached in memory.")
+        except Exception as sc_err:
+            print(f"⚠️ [warmup] Schedule pre-load warning: {sc_err}")
     except Exception as e:
         print(f"⚠️ [warmup] fastf1 import warning: {e}")
 
@@ -80,6 +86,8 @@ def _parse_cors_origins(raw: str) -> list[str]:
             pass
     return [o.strip() for o in raw.split(",") if o.strip()]
 
+from fastapi.middleware.gzip import GZipMiddleware
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
@@ -88,6 +96,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Enable GZip compression for responses > 500 bytes (compresses telemetry & transcripts by ~85%)
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 import os
 from fastapi.staticfiles import StaticFiles

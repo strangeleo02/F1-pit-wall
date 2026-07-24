@@ -4,12 +4,23 @@ import pandas as pd
 from typing import Any
 from fastapi.concurrency import run_in_threadpool
 
+_WEATHER_CACHE: dict[tuple[int, str, str], dict[str, Any]] = {}
+
 def get_session_weather(year: int, grand_prix: str, session_type: str = "R") -> dict[str, Any]:
     """
     Fetches real F1 session weather data using FastF1 weather feed dataframe.
     Extracts mean Track Temperature, Air Temperature, Humidity, and Rain status.
+    Uses in-memory caching to avoid repeated FastF1 session loads.
     """
+    cache_key = (year, grand_prix.lower(), session_type.upper())
+    if cache_key in _WEATHER_CACHE:
+        return _WEATHER_CACHE[cache_key]
+
     try:
+        from app.services.f1_service import _ensure_f1_libs
+        _ensure_f1_libs()
+        import fastf1
+
         session = fastf1.get_session(year, grand_prix, session_type)
         session.load(telemetry=False, laps=False, weather=True, messages=False)
 
@@ -21,7 +32,7 @@ def get_session_weather(year: int, grand_prix: str, session_type: str = "R") -> 
             has_rain = bool((w['Rainfall'].dropna() > 0).any()) if 'Rainfall' in w else False
             wind_speed = float(w['WindSpeed'].dropna().mean()) if 'WindSpeed' in w else 2.5
 
-            return {
+            res = {
                 "year": year,
                 "grand_prix": grand_prix,
                 "session_type": session_type,
@@ -32,6 +43,8 @@ def get_session_weather(year: int, grand_prix: str, session_type: str = "R") -> 
                 "wind_speed_ms": round(wind_speed, 1),
                 "status": "RAIN 🌧️" if has_rain else ("HOT ☀️" if track_temp >= 40.0 else "DRY 🌤️")
             }
+            _WEATHER_CACHE[cache_key] = res
+            return res
     except Exception as e:
         print(f"Weather fetch warning for {year} {grand_prix}: {e}")
 
