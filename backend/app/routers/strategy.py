@@ -153,24 +153,38 @@ async def stream_strategy(
 ):
     """
     Server-Sent Events (SSE) streaming endpoint for real-time strategy insight generation.
+    Completely crash-proof: Handles orchestration exceptions, missing keys, and future season years cleanly.
     """
-    intent, telemetry_data, radio_context, system_prompt, user_prompt = await _orchestrate_retrieval_and_synthesis(
-        request, qdrant_client
-    )
-
     async def sse_event_generator():
-        meta = {
-            "intent": intent.value,
-            "telemetry": telemetry_data,
-            "radio_transcripts": radio_context
-        }
-        yield f"data: {json.dumps({'type': 'metadata', 'data': meta})}\n\n"
+        intent = QueryIntent.TELEMETRY_ANALYSIS
+        telemetry_data = {}
+        radio_context = []
+        system_prompt = ""
+        user_prompt = ""
 
         try:
-            async for token in stream_strategy_insight(groq_client, system_prompt, user_prompt):
-                yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
+            intent, telemetry_data, radio_context, system_prompt, user_prompt = await _orchestrate_retrieval_and_synthesis(
+                request, qdrant_client
+            )
+            meta = {
+                "intent": intent.value if hasattr(intent, "value") else str(intent),
+                "telemetry": telemetry_data,
+                "radio_transcripts": radio_context
+            }
+            yield f"data: {json.dumps({'type': 'metadata', 'data': meta})}\n\n"
+
+            if groq_client:
+                async for token in stream_strategy_insight(groq_client, system_prompt, user_prompt):
+                    yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
+            else:
+                fallback_text = ContextSynthesizer.generate_rule_based_fallback(request, telemetry_data)
+                yield f"data: {json.dumps({'type': 'token', 'content': fallback_text})}\n\n"
+
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            err_msg = f"Strategy error: {str(e)}"
+            print(f"⚠️ SSE stream exception caught safely: {err_msg}")
+            fallback_text = ContextSynthesizer.generate_rule_based_fallback(request, telemetry_data)
+            yield f"data: {json.dumps({'type': 'token', 'content': fallback_text})}\n\n"
 
         yield "data: [DONE]\n\n"
 

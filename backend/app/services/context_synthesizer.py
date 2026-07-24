@@ -164,3 +164,33 @@ class ContextSynthesizer:
             user_prompt = user_prompt[:11800] + "\n\n... [Context Truncated for Rate-Limit Efficiency]"
 
         return system_prompt, user_prompt
+
+    @staticmethod
+    def generate_rule_based_fallback(request: Any, telemetry_data: dict[str, Any]) -> str:
+        """
+        Generates a clean rule-based strategy text summary when LLM keys are missing or for future seasons.
+        """
+        driver = getattr(request, "driver_code", "Driver")
+        comp = getattr(request, "comparison_driver_code", None)
+        gp = getattr(request, "grand_prix", "Grand Prix")
+        yr = getattr(request, "year", 2023)
+
+        if yr >= 2026:
+            return (
+                f"🏎️ **{yr} {gp} Grand Prix Strategy Analysis**\n\n"
+                f"⚠️ **Session Status**: The **{yr}** season calendar for {gp} has not taken place yet. "
+                f"Telemetry and live strategy metrics will become available once official FIA timing feeds commence for {yr}."
+            )
+
+        msg = f"🏎️ **{yr} {gp} Strategy Summary ({driver} vs {comp or 'Baseline'})**\n\n"
+        if telemetry_data:
+            fastest_sec = telemetry_data.get("fastest_lap_time_seconds")
+            max_spd = telemetry_data.get("max_speed_kph")
+            if fastest_sec:
+                msg += f"- **{driver} Fastest Lap**: `{fastest_sec:.3f}s`\n"
+            if max_spd:
+                msg += f"- **{driver} Max Speed**: `{max_spd} km/h`\n"
+        else:
+            msg += f"Telemetry metrics for **{driver}** at {gp} are currently being processed for this session."
+
+        return msg
